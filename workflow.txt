@@ -9,7 +9,17 @@ Team Members : Huzaifa Ahmed Khan (26485)
 --------------------------------------------
 WORKFLOW 1: Patient Management
 --------------------------------------------
-[To be filled by assigned member]
+1. User (receptionist) opens the application and logs in.
+2. User navigates to the "Patient Management" section.
+3. User clicks "Add New Patient".
+4. A form appears asking for patient details: name, age, gender,
+   contact number, address, and medical history.
+5. User fills in the details and clicks "Register Patient".
+6. System validates all fields for completeness and correct format.
+7. If valid, patient record is saved and a unique Patient ID is generated.
+8. User can search for existing patients using name or Patient ID.
+9. User can view, update, or delete any patient record.
+10. System displays a confirmation message after every action.
 
 --------------------------------------------
 WORKFLOW 2: Doctor Operations
@@ -19,4 +29,5 @@ WORKFLOW 2: Doctor Operations
 --------------------------------------------
 WORKFLOW 3: Administrative Control
 --------------------------------------------
+
 [To be filled by assigned member]

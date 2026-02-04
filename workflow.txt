@@ -1,0 +1,22 @@
+============================================
+   HOSPITAL MANAGEMENT SYSTEM - WORKFLOWS
+============================================
+
+Project Name : Hospital Management System
+Team Members : Huzaifa Ahmed Khan (26485)
+               Muhammad Bilal Adnan (27151)
+
+--------------------------------------------
+WORKFLOW 1: Patient Management
+--------------------------------------------
+[To be filled by assigned member]
+
+--------------------------------------------
+WORKFLOW 2: Doctor Operations
+--------------------------------------------
+[To be filled by assigned member]
+
+--------------------------------------------
+WORKFLOW 3: Administrative Control
+--------------------------------------------
+[To be filled by assigned member]

@@ -29,5 +29,14 @@ WORKFLOW 2: Doctor Operations
 --------------------------------------------
 WORKFLOW 3: Administrative Control
 --------------------------------------------
-
-[To be filled by assigned member]
+1. Admin logs into the system using admin credentials.
+2. Admin navigates to the "Administrative Control" dashboard.
+3. Admin can manage departments: add, update, or remove departments.
+4. Admin can view overall hospital statistics such as total patients,
+   total doctors, and department-wise breakdown.
+5. Admin can manage user accounts (receptionist, staff) including
+   creating, editing, and deactivating accounts.
+6. Admin can generate reports on patient and doctor activity.
+7. Admin can set system-wide settings such as hospital name and contact info.
+8. All actions performed by the admin are logged for audit purposes.
+9. System displays confirmation or error messages for every action taken.

@@ -24,7 +24,17 @@ WORKFLOW 1: Patient Management
 --------------------------------------------
 WORKFLOW 2: Doctor Operations
 --------------------------------------------
-[To be filled by assigned member]
+1. User (admin or receptionist) logs into the system.
+2. User navigates to the "Doctor Operations" section.
+3. User clicks "Add New Doctor".
+4. A form appears asking for doctor details: name, specialization,
+   contact number, availability schedule, and department.
+5. User fills in the details and clicks "Register Doctor".
+6. System validates the input and saves the doctor profile with a unique Doctor ID.
+7. User can search for doctors by name, specialization, or department.
+8. User can assign patients to specific doctors.
+9. User can view, update, or remove doctor records.
+10. System displays updated doctor schedules and assigned patient lists.
 
 --------------------------------------------
 WORKFLOW 3: Administrative Control
@@ -40,3 +50,4 @@ WORKFLOW 3: Administrative Control
 7. Admin can set system-wide settings such as hospital name and contact info.
 8. All actions performed by the admin are logged for audit purposes.
 9. System displays confirmation or error messages for every action taken.
+

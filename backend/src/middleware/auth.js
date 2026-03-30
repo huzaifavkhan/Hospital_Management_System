@@ -1,18 +1,33 @@
-/**
- * Authentication and authorization middleware.
- *
- * These are stub implementations that unconditionally pass every request
- * through so the router module can be required without crashing.  Replace the
- * bodies with real JWT verification / RBAC logic when the auth system is
- * integrated.
- */
+const jwt = require('jsonwebtoken');
 
 const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'No token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, message: 'Admin access required' });
+  }
   next();
 };
 
 const requireAdminOrReceptionist = (req, res, next) => {
+  if (!req.user || !['ADMIN', 'RECEPTIONIST'].includes(req.user.role)) {
+    return res.status(403).json({ success: false, message: 'Insufficient permissions' });
+  }
   next();
 };
 
-module.exports = { authenticate, requireAdminOrReceptionist };
+module.exports = { authenticate, requireAdmin, requireAdminOrReceptionist };

@@ -1,14 +1,34 @@
 const { PrismaClient } = require('@prisma/client');
+const { randomUUID } = require('crypto');
 
 const prisma = new PrismaClient();
 
-const generateDoctorId = async () => {
-  const count = await prisma.doctor.count();
-  return `DOC-${String(count + 1).padStart(5, '0')}`;
+const generateDoctorId = () => {
+  const raw = randomUUID().replace(/-/g, '');
+  const suffix = raw.slice(0, 12).toUpperCase();
+  return `DOC-${suffix}`;
+};
+
+const parsePositiveInt = (value, defaultValue, max = Infinity) => {
+  const parsed = parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return defaultValue;
+  return Math.min(parsed, max);
+};
+
+const validateId = (id, label = 'id') => {
+  const numericId = Number(id);
+  if (!Number.isFinite(numericId) || !Number.isInteger(numericId) || numericId < 1) {
+    const err = new Error(`Invalid ${label}`);
+    err.status = 400;
+    throw err;
+  }
+  return numericId;
 };
 
 const getAllDoctors = async ({ page = 1, limit = 10, search, departmentId, specialization } = {}) => {
-  const skip = (page - 1) * limit;
+  const parsedPage = parsePositiveInt(page, 1);
+  const parsedLimit = parsePositiveInt(limit, 10, 100);
+  const skip = (parsedPage - 1) * parsedLimit;
 
   const where = {};
   if (search) {
@@ -25,7 +45,7 @@ const getAllDoctors = async ({ page = 1, limit = 10, search, departmentId, speci
     prisma.doctor.findMany({
       where,
       skip,
-      take: Number(limit),
+      take: parsedLimit,
       orderBy: { createdAt: 'desc' },
       include: {
         department: { select: { id: true, name: true } },
@@ -41,13 +61,14 @@ const getAllDoctors = async ({ page = 1, limit = 10, search, departmentId, speci
 
   return {
     doctors,
-    pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / limit) },
+    pagination: { total, page: parsedPage, limit: parsedLimit, pages: Math.ceil(total / parsedLimit) },
   };
 };
 
 const getDoctorById = async (id) => {
+  const numericId = validateId(id, 'doctor id');
   const doctor = await prisma.doctor.findUnique({
-    where: { id: Number(id) },
+    where: { id: numericId },
     include: {
       department: { select: { id: true, name: true } },
       patients: {
@@ -81,7 +102,7 @@ const createDoctor = async ({ name, specialization, contactNumber, availabilityS
     }
   }
 
-  const doctorId = await generateDoctorId();
+  const doctorId = generateDoctorId();
   const doctor = await prisma.doctor.create({
     data: {
       doctorId,
@@ -99,8 +120,14 @@ const createDoctor = async ({ name, specialization, contactNumber, availabilityS
 const updateDoctor = async (id, data) => {
   await getDoctorById(id);
 
-  if (data.departmentId) {
-    const dept = await prisma.department.findUnique({ where: { id: Number(data.departmentId) } });
+  if (data.departmentId !== undefined && data.departmentId !== null) {
+    const deptId = Number(data.departmentId);
+    if (!Number.isFinite(deptId) || !Number.isInteger(deptId) || deptId < 1) {
+      const err = new Error('Invalid departmentId');
+      err.status = 400;
+      throw err;
+    }
+    const dept = await prisma.department.findUnique({ where: { id: deptId } });
     if (!dept) {
       const err = new Error('Department not found');
       err.status = 404;
@@ -112,7 +139,11 @@ const updateDoctor = async (id, data) => {
   const updateData = {};
   for (const key of allowed) {
     if (data[key] !== undefined) {
-      updateData[key] = key === 'departmentId' ? Number(data[key]) : data[key];
+      if (key === 'departmentId') {
+        updateData[key] = data[key] === null ? null : Number(data[key]);
+      } else {
+        updateData[key] = data[key];
+      }
     }
   }
 
@@ -131,14 +162,17 @@ const deleteDoctor = async (id) => {
 };
 
 const assignPatient = async (doctorId, patientId) => {
-  const doctor = await prisma.doctor.findUnique({ where: { id: Number(doctorId) } });
+  const numericDoctorId = validateId(doctorId, 'doctor id');
+  const numericPatientId = validateId(patientId, 'patient id');
+
+  const doctor = await prisma.doctor.findUnique({ where: { id: numericDoctorId } });
   if (!doctor) {
     const err = new Error('Doctor not found');
     err.status = 404;
     throw err;
   }
 
-  const patient = await prisma.patient.findUnique({ where: { id: Number(patientId) } });
+  const patient = await prisma.patient.findUnique({ where: { id: numericPatientId } });
   if (!patient) {
     const err = new Error('Patient not found');
     err.status = 404;
@@ -146,7 +180,7 @@ const assignPatient = async (doctorId, patientId) => {
   }
 
   const existing = await prisma.patientDoctor.findUnique({
-    where: { patientId_doctorId: { patientId: Number(patientId), doctorId: Number(doctorId) } },
+    where: { patientId_doctorId: { patientId: numericPatientId, doctorId: numericDoctorId } },
   });
   if (existing) {
     const err = new Error('Patient is already assigned to this doctor');
@@ -155,7 +189,7 @@ const assignPatient = async (doctorId, patientId) => {
   }
 
   const assignment = await prisma.patientDoctor.create({
-    data: { doctorId: Number(doctorId), patientId: Number(patientId) },
+    data: { doctorId: numericDoctorId, patientId: numericPatientId },
     include: {
       patient: { select: { id: true, patientId: true, name: true } },
       doctor: { select: { id: true, doctorId: true, name: true } },
@@ -165,8 +199,11 @@ const assignPatient = async (doctorId, patientId) => {
 };
 
 const unassignPatient = async (doctorId, patientId) => {
+  const numericDoctorId = validateId(doctorId, 'doctor id');
+  const numericPatientId = validateId(patientId, 'patient id');
+
   const assignment = await prisma.patientDoctor.findUnique({
-    where: { patientId_doctorId: { patientId: Number(patientId), doctorId: Number(doctorId) } },
+    where: { patientId_doctorId: { patientId: numericPatientId, doctorId: numericDoctorId } },
   });
   if (!assignment) {
     const err = new Error('Assignment not found');
@@ -175,13 +212,14 @@ const unassignPatient = async (doctorId, patientId) => {
   }
 
   await prisma.patientDoctor.delete({
-    where: { patientId_doctorId: { patientId: Number(patientId), doctorId: Number(doctorId) } },
+    where: { patientId_doctorId: { patientId: numericPatientId, doctorId: numericDoctorId } },
   });
   return { message: 'Patient unassigned successfully' };
 };
 
 const getDoctorPatients = async (doctorId) => {
-  const doctor = await prisma.doctor.findUnique({ where: { id: Number(doctorId) } });
+  const numericDoctorId = validateId(doctorId, 'doctor id');
+  const doctor = await prisma.doctor.findUnique({ where: { id: numericDoctorId } });
   if (!doctor) {
     const err = new Error('Doctor not found');
     err.status = 404;
@@ -189,8 +227,12 @@ const getDoctorPatients = async (doctorId) => {
   }
 
   const assignments = await prisma.patientDoctor.findMany({
-    where: { doctorId: Number(doctorId) },
-    include: { patient: true },
+    where: { doctorId: numericDoctorId },
+    include: {
+      patient: {
+        select: { id: true, patientId: true, name: true },
+      },
+    },
     orderBy: { assignedAt: 'desc' },
   });
   return assignments.map((a) => ({ ...a.patient, assignedAt: a.assignedAt }));

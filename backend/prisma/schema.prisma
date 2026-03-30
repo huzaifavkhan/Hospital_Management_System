@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  STAFF
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  username  String     @unique
+  password  String
+  fullName  String
+  role      Role       @default(RECEPTIONIST)
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditLogs AuditLog[]
+}
+
+model Patient {
+  id             Int             @id @default(autoincrement())
+  patientId      String          @unique
+  name           String
+  age            Int
+  gender         String
+  contactNumber  String
+  address        String
+  medicalHistory String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  doctors        PatientDoctor[]
+}
+
+model Department {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  doctors     Doctor[]
+}
+
+model Doctor {
+  id                   Int             @id @default(autoincrement())
+  doctorId             String          @unique
+  name                 String
+  specialization       String
+  contactNumber        String
+  availabilitySchedule Json?
+  departmentId         Int?
+  department           Department?     @relation(fields: [departmentId], references: [id])
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  patients             PatientDoctor[]
+}
+
+model PatientDoctor {
+  id         Int      @id @default(autoincrement())
+  patientId  Int
+  doctorId   Int
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor     Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@unique([patientId, doctorId])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+}
+
+model HospitalSettings {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}

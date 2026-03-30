@@ -5,11 +5,11 @@ const authService = require('../services/authService');
 // POST /api/auth/register
 router.post('/register', async (req, res, next) => {
   try {
-    const { username, password, fullName, role } = req.body;
+    const { username, password, fullName } = req.body;
     if (!username || !password || !fullName) {
       return res.status(400).json({ success: false, message: 'username, password, and fullName are required' });
     }
-    const user = await authService.register({ username, password, fullName, role });
+    const user = await authService.register({ username, password, fullName, role: 'RECEPTIONIST' });
     res.status(201).json({ success: true, message: 'User registered successfully', data: user });
   } catch (err) {
     next(err);

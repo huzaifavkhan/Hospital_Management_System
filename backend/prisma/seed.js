@@ -5,13 +5,24 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('Seed script is disabled in production. Set NODE_ENV to development to run seeds.');
+    return;
+  }
+
+  const adminUsername = process.env.SEED_ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error('SEED_ADMIN_PASSWORD environment variable is required to run seeds.');
+  }
+
   // Seed admin user
-  const hashedPassword = await bcrypt.hash('admin123', 10);
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
   await prisma.user.upsert({
-    where: { username: 'admin' },
+    where: { username: adminUsername },
     update: {},
     create: {
-      username: 'admin',
+      username: adminUsername,
       password: hashedPassword,
       fullName: 'System Administrator',
       role: 'ADMIN',
@@ -19,14 +30,20 @@ async function main() {
     },
   });
 
+  const receptionistUsername = process.env.SEED_RECEPTIONIST_USERNAME || 'receptionist';
+  const receptionistPassword = process.env.SEED_RECEPTIONIST_PASSWORD;
+  if (!receptionistPassword) {
+    throw new Error('SEED_RECEPTIONIST_PASSWORD environment variable is required to run seeds.');
+  }
+
   // Seed receptionist user
-  const receptionistPassword = await bcrypt.hash('recept123', 10);
+  const receptionistHashedPassword = await bcrypt.hash(receptionistPassword, 10);
   await prisma.user.upsert({
-    where: { username: 'receptionist' },
+    where: { username: receptionistUsername },
     update: {},
     create: {
-      username: 'receptionist',
-      password: receptionistPassword,
+      username: receptionistUsername,
+      password: receptionistHashedPassword,
       fullName: 'Front Desk',
       role: 'RECEPTIONIST',
       isActive: true,

@@ -52,17 +52,13 @@ Hospital_Management_System/
     │   └── migrations/
     └── src/
         ├── app.js
+        ├── db/
+        │   └── prisma.js       ← Shared Prisma client
         ├── routes/             ← URL handlers
         │   ├── index.js
-        │   ├── auth.js
-        │   ├── patients.js
-        │   ├── doctors.js
-        │   └── admin.js
+        │   └── auth.js
         ├── services/           ← Business logic
-        │   ├── authService.js
-        │   ├── patientService.js
-        │   ├── doctorService.js
-        │   └── adminService.js
+        │   └── authService.js
         └── middleware/
             ├── auth.js         ← JWT verification
             └── auditLog.js     ← Audit logging
@@ -136,7 +132,7 @@ This creates all the tables in the database.
 npm run prisma:seed
 ```
 
-This creates default admin/receptionist accounts, 5 departments, and default hospital settings.
+This creates default admin/receptionist accounts (credentials come from your `.env` — see `SEED_ADMIN_PASSWORD` and `SEED_RECEPTIONIST_PASSWORD`), 5 departments, and default hospital settings.
 
 ### Step 7 — Start the backend server
 
@@ -171,17 +167,21 @@ Database connected successfully
 | `JWT_SECRET` | `your_super_secret_jwt_key_change_in_production` | Secret key for signing JWT tokens |
 | `JWT_EXPIRES_IN` | `24h` | How long JWT tokens stay valid |
 | `FRONTEND_URL` | `http://localhost:3000` | Allowed CORS origin |
+| `SEED_ADMIN_USERNAME` | `admin` | Username for the seeded admin account |
+| `SEED_ADMIN_PASSWORD` | *(required)* | Password for the seeded admin account |
+| `SEED_RECEPTIONIST_USERNAME` | `receptionist` | Username for the seeded receptionist account |
+| `SEED_RECEPTIONIST_PASSWORD` | *(required)* | Password for the seeded receptionist account |
 
 ---
 
 ## Default Seed Accounts
 
-After running the seed command, these accounts are available:
+After running the seed command, these accounts are available (usernames/passwords are set via env variables — see `SEED_ADMIN_*` / `SEED_RECEPTIONIST_*` in `.env.example`):
 
 | Username | Password | Role |
 |----------|----------|------|
-| `admin` | `admin123` | ADMIN |
-| `receptionist` | `recept123` | RECEPTIONIST |
+| `$SEED_ADMIN_USERNAME` | `$SEED_ADMIN_PASSWORD` | ADMIN |
+| `$SEED_RECEPTIONIST_USERNAME` | `$SEED_RECEPTIONIST_PASSWORD` | RECEPTIONIST |
 
 **Role permissions:**
 - **ADMIN** — Full access to all routes including admin panel
@@ -319,7 +319,7 @@ Request body:
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "<your SEED_ADMIN_PASSWORD>"
 }
 ```
 

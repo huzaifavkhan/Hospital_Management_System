@@ -1,18 +1,30 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../db/prisma');
+
+const SENSITIVE_FIELDS = ['password', 'token', 'accessToken', 'refreshToken', 'secret'];
+
+function redactSensitiveFields(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  return Object.fromEntries(
+    Object.entries(obj).map(([key, value]) => [
+      key,
+      SENSITIVE_FIELDS.includes(key)
+        ? '[REDACTED]'
+        : value && typeof value === 'object'
+        ? redactSensitiveFields(value)
+        : value,
+    ])
+  );
+}
 
 const auditLog = (action, entity) => {
-  return async (req, res, next) => {
-    const originalJson = res.json.bind(res);
-
-    res.json = async (body) => {
+  return (req, res, next) => {
+    res.on('finish', () => {
       if (res.statusCode < 400) {
-        try {
-          const entityId =
-            req.params.id ||
-            (body && body.data && (body.data.id || body.data.patientId || body.data.doctorId));
+        const entityId = req.params.id || undefined;
+        const safeBody = req.method !== 'GET' ? redactSensitiveFields(req.body) : undefined;
 
-          await prisma.auditLog.create({
+        prisma.auditLog
+          .create({
             data: {
               userId: req.user ? req.user.id : null,
               action,
@@ -21,16 +33,13 @@ const auditLog = (action, entity) => {
               details: {
                 method: req.method,
                 path: req.path,
-                body: req.method !== 'GET' ? req.body : undefined,
+                body: safeBody,
               },
             },
-          });
-        } catch (err) {
-          console.error('Audit log error:', err.message);
-        }
+          })
+          .catch((err) => console.error('Audit log error:', err.message));
       }
-      return originalJson(body);
-    };
+    });
 
     next();
   };

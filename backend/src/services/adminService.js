@@ -1,7 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../db/prisma');
 const bcrypt = require('bcryptjs');
 
-const prisma = new PrismaClient();
+const PAGINATION_MAX_LIMIT = 100;
 
 // ── Statistics ──────────────────────────────────────────────────────────────
 
@@ -92,14 +92,25 @@ const updateDepartment = async (id, { name, description }) => {
 
 const deleteDepartment = async (id) => {
   await getDepartmentById(id);
-  await prisma.department.delete({ where: { id: Number(id) } });
+  try {
+    await prisma.department.delete({ where: { id: Number(id) } });
+  } catch (e) {
+    if (e.code === 'P2003') {
+      const err = new Error('Cannot delete department with assigned doctors');
+      err.status = 409;
+      throw err;
+    }
+    throw e;
+  }
   return { message: 'Department deleted successfully' };
 };
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
 const getAllUsers = async ({ page = 1, limit = 10, search, role } = {}) => {
-  const skip = (page - 1) * limit;
+  const pageNum = Math.max(1, Number(page));
+  const limitNum = Math.min(PAGINATION_MAX_LIMIT, Math.max(1, Number(limit)));
+  const skip = (pageNum - 1) * limitNum;
 
   const where = {};
   if (search) {
@@ -114,14 +125,14 @@ const getAllUsers = async ({ page = 1, limit = 10, search, role } = {}) => {
     prisma.user.findMany({
       where,
       skip,
-      take: Number(limit),
+      take: limitNum,
       orderBy: { createdAt: 'desc' },
       select: { id: true, username: true, fullName: true, role: true, isActive: true, createdAt: true, updatedAt: true },
     }),
     prisma.user.count({ where }),
   ]);
 
-  return { users, pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / limit) } };
+  return { users, pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) } };
 };
 
 const getUserById = async (id) => {
@@ -156,11 +167,20 @@ const createUser = async ({ username, password, fullName, role }) => {
   });
 };
 
+const VALID_ROLES = ['ADMIN', 'RECEPTIONIST', 'STAFF'];
+
 const updateUser = async (id, data) => {
   await getUserById(id);
   const updateData = {};
   if (data.fullName) updateData.fullName = data.fullName;
-  if (data.role) updateData.role = data.role;
+  if (data.role) {
+    if (!VALID_ROLES.includes(data.role)) {
+      const err = new Error(`Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`);
+      err.status = 400;
+      throw err;
+    }
+    updateData.role = data.role;
+  }
   if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
   if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
 
@@ -180,7 +200,9 @@ const deactivateUser = async (id) => {
 // ── Audit Logs ───────────────────────────────────────────────────────────────
 
 const getAuditLogs = async ({ page = 1, limit = 20, entity, action } = {}) => {
-  const skip = (page - 1) * limit;
+  const pageNum = Math.max(1, Number(page));
+  const limitNum = Math.min(PAGINATION_MAX_LIMIT, Math.max(1, Number(limit)));
+  const skip = (pageNum - 1) * limitNum;
   const where = {};
   if (entity) where.entity = entity;
   if (action) where.action = action;
@@ -189,14 +211,14 @@ const getAuditLogs = async ({ page = 1, limit = 20, entity, action } = {}) => {
     prisma.auditLog.findMany({
       where,
       skip,
-      take: Number(limit),
+      take: limitNum,
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { id: true, username: true, fullName: true } } },
     }),
     prisma.auditLog.count({ where }),
   ]);
 
-  return { logs, pagination: { total, page: Number(page), limit: Number(limit), pages: Math.ceil(total / limit) } };
+  return { logs, pagination: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) } };
 };
 
 // ── Hospital Settings ────────────────────────────────────────────────────────
@@ -231,6 +253,7 @@ const generateReport = async ({ type, from, to } = {}) => {
     const patients = await prisma.patient.findMany({
       where: createdAt ? { createdAt } : {},
       orderBy: { createdAt: 'desc' },
+      take: PAGINATION_MAX_LIMIT,
       include: { doctors: { include: { doctor: { select: { name: true, specialization: true } } } } },
     });
     return { type: 'patients', count: patients.length, data: patients };
@@ -240,6 +263,7 @@ const generateReport = async ({ type, from, to } = {}) => {
     const doctors = await prisma.doctor.findMany({
       where: createdAt ? { createdAt } : {},
       orderBy: { createdAt: 'desc' },
+      take: PAGINATION_MAX_LIMIT,
       include: {
         department: { select: { name: true } },
         _count: { select: { patients: true } },

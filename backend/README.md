@@ -12,16 +12,15 @@
 3. [Setup & Running](#setup--running)
 4. [Environment Variables](#environment-variables)
 5. [Default Seed Accounts](#default-seed-accounts)
-6. [Postman Setup](#postman-setup)
-7. [API Routes — Step-by-Step Postman Guide](#api-routes--step-by-step-postman-guide)
+6. [API Routes — Step-by-Step Postman Guide](#api-routes--step-by-step-postman-guide)
    - [Health Check](#health-check)
    - [Authentication](#authentication)
    - [Workflow 1 — Patient Management](#workflow-1--patient-management)
    - [Workflow 2 — Doctor Operations](#workflow-2--doctor-operations)
    - [Workflow 3 — Administrative Control](#workflow-3--administrative-control)
-8. [Response Format](#response-format)
-9. [Database Schema](#database-schema)
-10. [Stopping the Database](#stopping-the-database)
+7. [Response Format](#response-format)
+8. [Database Schema](#database-schema)
+9. [Stopping the Database](#stopping-the-database)
 
 ---
 
@@ -187,57 +186,6 @@ After running the seed command, these accounts are available (usernames/password
 - **ADMIN** — Full access to all routes including admin panel
 - **RECEPTIONIST** — Can manage patients and doctors, cannot access admin panel
 - **STAFF** — Read-only access to patients and doctors
-
----
-
-## Postman Setup
-
-### Create a Collection
-
-1. Open Postman
-2. Click **Collections** in the left sidebar
-3. Click **+** to create a new collection
-4. Name it `Hospital Management System`
-
-### Create an Environment
-
-This stores your JWT token so you don't have to paste it into every request.
-
-1. Click **Environments** in the left sidebar
-2. Click **+** to create a new environment
-3. Name it `HMS Local`
-4. Add the following variables:
-
-| Variable | Initial Value | Current Value |
-|----------|--------------|---------------|
-| `base_url` | `http://localhost:5001/api` | `http://localhost:5001/api` |
-| `token` | (leave empty) | (leave empty) |
-
-5. Click **Save**
-6. Select `HMS Local` from the environment dropdown (top-right of Postman)
-
-### Auto-save token after login
-
-On your **Login** request (created below):
-
-1. Go to the **Tests** tab
-2. Paste this script:
-
-```javascript
-const res = pm.response.json();
-if (res.success && res.data.token) {
-    pm.environment.set("token", res.data.token);
-    console.log("Token saved!");
-}
-```
-
-Now every time you log in, the token is automatically saved to the environment.
-
-### Use the token in requests
-
-For all protected routes, go to the **Authorization** tab of the request:
-- Type: **Bearer Token**
-- Token: `{{token}}`
 
 ---
 

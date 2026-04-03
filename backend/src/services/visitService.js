@@ -1,14 +1,5 @@
 const prisma = require('../db/prisma');
-
-const parseId = (id) => {
-  const num = Number(id);
-  if (!Number.isFinite(num) || !Number.isInteger(num) || num < 1) {
-    const err = new Error('Invalid ID: must be a positive integer');
-    err.status = 400;
-    throw err;
-  }
-  return num;
-};
+const { parseId } = require('../utils/ids');
 
 const getVisitsByPatient = async (patientId) => {
   const numericId = parseId(patientId);
@@ -74,9 +65,10 @@ const createVisit = async (patientId, { doctorId, visitDate, diagnosis, summary 
   });
 };
 
-const updateVisit = async (visitId, { diagnosis, summary, visitDate }) => {
+const updateVisit = async (patientId, visitId, { diagnosis, summary, visitDate }) => {
+  const numericPatientId = parseId(patientId);
   const numericId = parseId(visitId);
-  const visit = await prisma.visit.findUnique({ where: { id: numericId } });
+  const visit = await prisma.visit.findFirst({ where: { id: numericId, patientId: numericPatientId } });
   if (!visit) {
     const err = new Error('Visit not found');
     err.status = 404;
@@ -105,15 +97,24 @@ const updateVisit = async (visitId, { diagnosis, summary, visitDate }) => {
   });
 };
 
-const deleteVisit = async (visitId) => {
-  const numericId = parseId(visitId);
-  const visit = await prisma.visit.findUnique({ where: { id: numericId } });
-  if (!visit) {
-    const err = new Error('Visit not found');
-    err.status = 404;
-    throw err;
-  }
-  await prisma.visit.delete({ where: { id: numericId } });
+const deleteVisit = async (patientId, visitId) => {
+  const numericPatientId = parseId(patientId);
+  const numericVisitId = parseId(visitId);
+
+  await prisma.$transaction(async (tx) => {
+    const visit = await tx.visit.findFirst({
+      where: { id: numericVisitId, patientId: numericPatientId },
+    });
+
+    if (!visit) {
+      const err = new Error('Visit not found');
+      err.status = 404;
+      throw err;
+    }
+
+    await tx.visit.delete({ where: { id: numericVisitId } });
+  });
+
   return { message: 'Visit deleted successfully' };
 };
 

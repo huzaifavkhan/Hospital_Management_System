@@ -1,22 +1,12 @@
 const prisma = require('../db/prisma');
 const bcrypt = require('bcryptjs');
+const { parseId } = require('../utils/ids');
 
 const PAGINATION_MAX_LIMIT = 100;
 const VALID_ROLES = ['ADMIN', 'RECEPTIONIST', 'STAFF'];
 const VALID_REPORT_TYPES = ['patients', 'doctors', 'summary'];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-const parseId = (id) => {
-  const num = Number(id);
-  if (!Number.isFinite(num) || !Number.isInteger(num) || num < 1) {
-    const err = new Error('Invalid ID: must be a positive integer');
-    err.status = 400;
-    throw err;
-  }
-  return num;
-};
-
 const parsePagination = (page, limit) => {
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);

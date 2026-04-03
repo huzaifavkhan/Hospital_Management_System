@@ -157,7 +157,16 @@ const updateDoctor = async (id, data) => {
 
 const deleteDoctor = async (id) => {
   await getDoctorById(id);
-  await prisma.doctor.delete({ where: { id: Number(id) } });
+  try {
+    await prisma.doctor.delete({ where: { id: Number(id) } });
+  } catch (e) {
+    if (e.code === 'P2003') {
+      const err = new Error('Cannot delete doctor with existing visit records');
+      err.status = 409;
+      throw err;
+    }
+    throw e;
+  }
   return { message: 'Doctor removed successfully' };
 };
 

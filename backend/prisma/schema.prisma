@@ -83,7 +83,7 @@ model Visit {
   diagnosis String?
   summary   String?
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

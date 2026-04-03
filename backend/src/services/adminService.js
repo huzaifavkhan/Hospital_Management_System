@@ -36,7 +36,12 @@ const parsePagination = (page, limit) => {
 // ── Statistics ──────────────────────────────────────────────────────────────
 
 const getStats = async () => {
-  const [totalPatients, totalDoctors, totalDepartments, totalUsers, departmentBreakdown] =
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const [totalPatients, totalDoctors, totalDepartments, totalUsers, departmentBreakdown, todaysAppointments] =
     await Promise.all([
       prisma.patient.count(),
       prisma.doctor.count(),
@@ -46,6 +51,9 @@ const getStats = async () => {
         include: { _count: { select: { doctors: true } } },
         orderBy: { name: 'asc' },
       }),
+      prisma.appointment.count({
+        where: { dateTime: { gte: todayStart, lte: todayEnd }, status: { in: ['SCHEDULED', 'RESCHEDULED'] } },
+      }),
     ]);
 
   return {
@@ -53,6 +61,7 @@ const getStats = async () => {
     totalDoctors,
     totalDepartments,
     totalUsers,
+    todaysAppointments,
     departmentBreakdown: departmentBreakdown.map((d) => ({
       id: d.id,
       name: d.name,

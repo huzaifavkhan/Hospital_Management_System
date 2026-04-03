@@ -18,6 +18,7 @@
    - [Workflow 1 — Patient Management](#workflow-1--patient-management)
    - [Workflow 2 — Doctor Operations](#workflow-2--doctor-operations)
    - [Workflow 3 — Administrative Control](#workflow-3--administrative-control)
+   - [Workflow 4 — Appointment & Scheduling](#workflow-4--appointment--scheduling)
 7. [Response Format](#response-format)
 8. [Database Schema](#database-schema)
 9. [Stopping the Database](#stopping-the-database)
@@ -55,9 +56,19 @@ Hospital_Management_System/
         │   └── prisma.js       ← Shared Prisma client
         ├── routes/             ← URL handlers
         │   ├── index.js
-        │   └── auth.js
+        │   ├── auth.js
+        │   ├── patients.js
+        │   ├── visits.js       ← Visit history (nested under patients)
+        │   ├── doctors.js
+        │   ├── appointments.js
+        │   └── admin.js
         ├── services/           ← Business logic
-        │   └── authService.js
+        │   ├── authService.js
+        │   ├── patientService.js
+        │   ├── visitService.js
+        │   ├── doctorService.js
+        │   ├── appointmentService.js
+        │   └── adminService.js
         └── middleware/
             ├── auth.js         ← JWT verification
             └── auditLog.js     ← Audit logging
@@ -120,8 +131,10 @@ The defaults in `.env.example` already match the Docker Compose configuration. N
 ### Step 5 — Run database migrations
 
 ```bash
-npx prisma migrate dev --name init
+npm run prisma:migrate
 ```
+
+> **Note:** This uses the local Prisma binary (`./node_modules/.bin/prisma migrate dev`). Do **not** use `npx prisma` as it may install a newer incompatible version.
 
 This creates all the tables in the database.
 
@@ -184,7 +197,7 @@ After running the seed command, these accounts are available (usernames/password
 
 **Role permissions:**
 - **ADMIN** — Full access to all routes including admin panel
-- **RECEPTIONIST** — Can manage patients and doctors, cannot access admin panel
+- **RECEPTIONIST** — Can manage patients, doctors, visits, and appointments; cannot access admin panel
 - **STAFF** — Read-only access to patients and doctors
 
 ---
@@ -231,12 +244,9 @@ Request body:
 {
   "username": "nurse01",
   "password": "securepass123",
-  "fullName": "Jane Smith",
-  "role": "STAFF"
+  "fullName": "Jane Smith"
 }
 ```
-
-> **Note:** Valid roles are `ADMIN`, `RECEPTIONIST`, `STAFF`.
 
 Expected response:
 ```json
@@ -247,14 +257,16 @@ Expected response:
     "id": 3,
     "username": "nurse01",
     "fullName": "Jane Smith",
-    "role": "STAFF"
+    "role": "RECEPTIONIST"
   }
 }
 ```
 
 ---
 
-#### Login
+#### Login (generic)
+
+Works for any role. The response includes the user's role so the frontend can redirect accordingly.
 
 | Field | Value |
 |-------|-------|
@@ -287,7 +299,142 @@ Expected response:
 }
 ```
 
-> If you added the Tests script from the Postman Setup section, the token is saved automatically. Otherwise, copy the token value and set it manually in the environment.
+> Copy the `token` value and use it as a Bearer Token in all subsequent requests.
+
+---
+
+#### Login — Admin only
+
+Rejects login if the account is not an ADMIN. Use this endpoint for a dedicated admin login page.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/auth/login/admin` |
+| Auth | None |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "username": "admin",
+  "password": "<your SEED_ADMIN_PASSWORD>"
+}
+```
+
+Returns `403 Forbidden` if the account role is not `ADMIN`.
+
+---
+
+#### Login — Receptionist only
+
+Rejects login if the account is not a RECEPTIONIST.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/auth/login/receptionist` |
+| Auth | None |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "username": "receptionist",
+  "password": "<your SEED_RECEPTIONIST_PASSWORD>"
+}
+```
+
+Returns `403 Forbidden` if the account role is not `RECEPTIONIST`.
+
+---
+
+#### Change password (authenticated)
+
+Allows a logged-in user to change their own password.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/auth/change-password` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "currentPassword": "oldpassword123",
+  "newPassword": "newpassword456"
+}
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Password changed successfully"
+}
+```
+
+---
+
+#### Forgot password
+
+Generates a password reset token. In a production system this would be emailed; here the token is returned directly for testing purposes.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/auth/forgot-password` |
+| Auth | None |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "username": "receptionist"
+}
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Reset token generated",
+  "resetToken": "a3f8c2d1e4b9..."
+}
+```
+
+> Copy the `resetToken` value — you will need it in the next step. The token expires after **1 hour**.
+
+---
+
+#### Reset password
+
+Uses the token from the previous step to set a new password.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/auth/reset-password` |
+| Auth | None |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "resetToken": "a3f8c2d1e4b9...",
+  "newPassword": "freshpassword789"
+}
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Password reset successfully"
+}
+```
 
 ---
 
@@ -472,6 +619,155 @@ Expected response:
 {
   "success": true,
   "message": "Patient deleted successfully"
+}
+```
+
+---
+
+#### Visit History
+
+Visit history is nested under a patient. Each visit records the attending doctor, date, diagnosis, and a summary.
+
+---
+
+#### 1.6 — List all visits for a patient
+
+| Field | Value |
+|-------|-------|
+| Method | GET |
+| URL | `http://localhost:5001/api/patients/1/visits` |
+| Auth | Bearer Token → `{{token}}` |
+
+Replace `1` with the patient's numeric ID. Results are ordered newest-first.
+
+Expected response:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "visitDate": "2024-03-10T09:00:00.000Z",
+      "diagnosis": "Hypertensive crisis",
+      "summary": "BP was 180/110. Administered medication and advised rest.",
+      "doctor": {
+        "id": 1,
+        "doctorId": "DOC-00001",
+        "name": "Dr. Sarah Johnson",
+        "specialization": "Cardiology"
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### 1.7 — Log a new visit
+
+> Requires ADMIN or RECEPTIONIST role.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/patients/1/visits` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "doctorId": 1,
+  "visitDate": "2024-03-10T09:00:00.000Z",
+  "diagnosis": "Hypertensive crisis",
+  "summary": "BP was 180/110. Administered medication and advised rest."
+}
+```
+
+> `doctorId` and `visitDate` are required. `diagnosis` and `summary` are optional.
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Visit recorded successfully",
+  "data": {
+    "id": 1,
+    "visitDate": "2024-03-10T09:00:00.000Z",
+    "diagnosis": "Hypertensive crisis",
+    "summary": "BP was 180/110. Administered medication and advised rest.",
+    "doctor": {
+      "id": 1,
+      "doctorId": "DOC-00001",
+      "name": "Dr. Sarah Johnson",
+      "specialization": "Cardiology"
+    },
+    "patient": {
+      "id": 1,
+      "patientId": "PAT-00001",
+      "name": "John Doe"
+    }
+  }
+}
+```
+
+---
+
+#### 1.8 — Update a visit record
+
+> Requires ADMIN or RECEPTIONIST role.
+
+| Field | Value |
+|-------|-------|
+| Method | PUT |
+| URL | `http://localhost:5001/api/patients/1/visits/1` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | raw → JSON |
+
+Request body (include only the fields you want to update):
+```json
+{
+  "diagnosis": "Stage 2 Hypertension",
+  "summary": "Updated summary after lab results reviewed."
+}
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Visit updated successfully",
+  "data": {
+    "id": 1,
+    "visitDate": "2024-03-10T09:00:00.000Z",
+    "diagnosis": "Stage 2 Hypertension",
+    "summary": "Updated summary after lab results reviewed.",
+    "doctor": {
+      "id": 1,
+      "name": "Dr. Sarah Johnson"
+    }
+  }
+}
+```
+
+---
+
+#### 1.9 — Delete a visit record
+
+> Requires ADMIN or RECEPTIONIST role.
+
+| Field | Value |
+|-------|-------|
+| Method | DELETE |
+| URL | `http://localhost:5001/api/patients/1/visits/1` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | None |
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Visit deleted successfully"
 }
 ```
 
@@ -771,6 +1067,7 @@ Expected response:
     "totalDoctors": 5,
     "totalDepartments": 5,
     "totalUsers": 3,
+    "todaysAppointments": 4,
     "departmentBreakdown": [
       { "name": "Cardiology", "doctorCount": 2 },
       { "name": "Neurology", "doctorCount": 1 }
@@ -1121,10 +1418,10 @@ Expected response (summary):
   "success": true,
   "data": {
     "type": "summary",
-    "generatedAt": "2024-06-01T12:00:00.000Z",
-    "totalPatients": 10,
-    "totalDoctors": 5,
-    "totalDepartments": 5
+    "data": {
+      "patients": 10,
+      "doctors": 5
+    }
   }
 }
 ```
@@ -1147,12 +1444,12 @@ Query parameters:
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
-| `entity` | `Patient` | Filter by entity type (`Patient`, `Doctor`, `Department`, `User`) |
-| `action` | `CREATE` | Filter by action (`CREATE`, `UPDATE`, `DELETE`, `ASSIGN_PATIENT`) |
+| `entity` | `Patient` | Filter by entity type (`Patient`, `Doctor`, `Visit`, `Appointment`, `Department`, `User`) |
+| `action` | `CREATE` | Filter by action (`CREATE`, `UPDATE`, `DELETE`, `CANCEL`, `ASSIGN_PATIENT`) |
 | `page` | `1` | Page number |
 | `limit` | `20` | Results per page |
 
-Example: `http://localhost:5001/api/admin/audit-logs?entity=Patient&action=CREATE&page=1&limit=20`
+Example: `http://localhost:5001/api/admin/audit-logs?entity=Appointment&action=CREATE&page=1&limit=20`
 
 Expected response:
 ```json
@@ -1241,6 +1538,206 @@ Expected response:
 
 ---
 
+### Workflow 4 — Appointment & Scheduling
+
+> All appointment routes require authentication. Creating, updating, and cancelling appointments requires ADMIN or RECEPTIONIST role.
+
+---
+
+#### 4.1 — Book an appointment
+
+> Requires ADMIN or RECEPTIONIST role.
+> The API **prevents double-booking** — a doctor cannot have two appointments within 30 minutes of each other.
+
+| Field | Value |
+|-------|-------|
+| Method | POST |
+| URL | `http://localhost:5001/api/appointments` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "patientId": 1,
+  "doctorId": 1,
+  "dateTime": "2024-06-15T10:00:00.000Z",
+  "notes": "Follow-up for blood pressure management"
+}
+```
+
+> `patientId`, `doctorId`, and `dateTime` are required. `notes` is optional.
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Appointment booked successfully",
+  "data": {
+    "id": 1,
+    "appointmentId": "APT-3F8C2D1E4B",
+    "dateTime": "2024-06-15T10:00:00.000Z",
+    "status": "SCHEDULED",
+    "notes": "Follow-up for blood pressure management",
+    "patient": {
+      "id": 1,
+      "patientId": "PAT-00001",
+      "name": "John Doe",
+      "contactNumber": "+1-555-0100"
+    },
+    "doctor": {
+      "id": 1,
+      "doctorId": "DOC-00001",
+      "name": "Dr. Sarah Johnson",
+      "specialization": "Cardiology"
+    }
+  }
+}
+```
+
+> If the doctor is already booked within 30 minutes of the requested time, a `409 Conflict` response is returned.
+
+---
+
+#### 4.2 — List all appointments
+
+| Field | Value |
+|-------|-------|
+| Method | GET |
+| URL | `http://localhost:5001/api/appointments` |
+| Auth | Bearer Token → `{{token}}` |
+
+With optional query parameters:
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| `patientId` | `1` | Filter by patient |
+| `doctorId` | `1` | Filter by doctor |
+| `status` | `SCHEDULED` | Filter by status (`SCHEDULED`, `CANCELLED`, `COMPLETED`, `RESCHEDULED`) |
+| `from` | `2024-06-01` | Start date |
+| `to` | `2024-06-30` | End date |
+| `page` | `1` | Page number |
+| `limit` | `10` | Results per page |
+
+Examples:
+- Upcoming for a patient: `http://localhost:5001/api/appointments?patientId=1&status=SCHEDULED`
+- Today's for a doctor: `http://localhost:5001/api/appointments?doctorId=1&from=2024-06-15&to=2024-06-15`
+
+Expected response:
+```json
+{
+  "success": true,
+  "data": {
+    "appointments": [
+      {
+        "id": 1,
+        "appointmentId": "APT-3F8C2D1E4B",
+        "dateTime": "2024-06-15T10:00:00.000Z",
+        "status": "SCHEDULED",
+        "notes": "Follow-up for blood pressure management",
+        "patient": { "id": 1, "patientId": "PAT-00001", "name": "John Doe" },
+        "doctor": { "id": 1, "doctorId": "DOC-00001", "name": "Dr. Sarah Johnson" }
+      }
+    ],
+    "pagination": {
+      "total": 1,
+      "page": 1,
+      "limit": 10,
+      "pages": 1
+    }
+  }
+}
+```
+
+---
+
+#### 4.3 — Get a single appointment
+
+| Field | Value |
+|-------|-------|
+| Method | GET |
+| URL | `http://localhost:5001/api/appointments/1` |
+| Auth | Bearer Token → `{{token}}` |
+
+Replace `1` with the appointment's numeric ID.
+
+---
+
+#### 4.4 — Reschedule an appointment
+
+> Requires ADMIN or RECEPTIONIST role.
+> Changing the `dateTime` automatically sets the status to `RESCHEDULED` unless you also pass a `status`.
+> Double-booking is still checked on reschedule.
+
+| Field | Value |
+|-------|-------|
+| Method | PUT |
+| URL | `http://localhost:5001/api/appointments/1` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | raw → JSON |
+
+Request body:
+```json
+{
+  "dateTime": "2024-06-20T14:00:00.000Z",
+  "notes": "Rescheduled at patient request"
+}
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Appointment updated successfully",
+  "data": {
+    "id": 1,
+    "appointmentId": "APT-3F8C2D1E4B",
+    "dateTime": "2024-06-20T14:00:00.000Z",
+    "status": "RESCHEDULED",
+    "notes": "Rescheduled at patient request",
+    "patient": { "id": 1, "name": "John Doe" },
+    "doctor": { "id": 1, "name": "Dr. Sarah Johnson" }
+  }
+}
+```
+
+You can also update just the `status` (e.g., mark as completed):
+```json
+{
+  "status": "COMPLETED"
+}
+```
+
+---
+
+#### 4.5 — Cancel an appointment
+
+> Requires ADMIN or RECEPTIONIST role.
+
+| Field | Value |
+|-------|-------|
+| Method | PATCH |
+| URL | `http://localhost:5001/api/appointments/1/cancel` |
+| Auth | Bearer Token → `{{token}}` |
+| Body | None |
+
+Expected response:
+```json
+{
+  "success": true,
+  "message": "Appointment cancelled successfully",
+  "data": {
+    "id": 1,
+    "appointmentId": "APT-3F8C2D1E4B",
+    "status": "CANCELLED",
+    "patient": { "id": 1, "name": "John Doe" },
+    "doctor": { "id": 1, "name": "Dr. Sarah Johnson" }
+  }
+}
+```
+
+---
+
 ## Response Format
 
 Every API response follows this consistent structure:
@@ -1272,7 +1769,7 @@ Every API response follows this consistent structure:
 | `401` | Unauthorized — no token or token expired |
 | `403` | Forbidden — valid token but insufficient role |
 | `404` | Not Found — resource does not exist |
-| `409` | Conflict — duplicate entry (e.g., username already taken) |
+| `409` | Conflict — duplicate entry or double-booking |
 | `500` | Internal Server Error — something went wrong on the server |
 
 ---
@@ -1281,11 +1778,13 @@ Every API response follows this consistent structure:
 
 | Model | Key Fields |
 |-------|-----------|
-| `User` | `id`, `username`, `password` (hashed), `fullName`, `role` (ADMIN/RECEPTIONIST/STAFF), `isActive` |
+| `User` | `id`, `username`, `password` (hashed), `fullName`, `role` (ADMIN/RECEPTIONIST/STAFF), `isActive`, `passwordResetToken`, `passwordResetExpiry` |
 | `Patient` | `id`, `patientId` (PAT-XXXXX), `name`, `age`, `gender`, `contactNumber`, `address`, `medicalHistory` |
 | `Doctor` | `id`, `doctorId` (DOC-XXXXX), `name`, `specialization`, `contactNumber`, `availabilitySchedule` (JSON), `departmentId` |
 | `Department` | `id`, `name`, `description` |
 | `PatientDoctor` | `patientId`, `doctorId`, `assignedAt` (join table) |
+| `Visit` | `id`, `patientId`, `doctorId`, `visitDate`, `diagnosis`, `summary` |
+| `Appointment` | `id`, `appointmentId` (APT-XXXXX), `patientId`, `doctorId`, `dateTime`, `status` (SCHEDULED/CANCELLED/COMPLETED/RESCHEDULED), `notes` |
 | `AuditLog` | `id`, `userId`, `action`, `entity`, `entityId`, `details`, `createdAt` |
 | `HospitalSettings` | `id`, `key`, `value` |
 

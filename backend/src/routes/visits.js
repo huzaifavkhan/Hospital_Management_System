@@ -31,14 +31,14 @@ router.post(
   }
 );
 
-// PUT /api/patients/:patientId/visits/:visitId
+// PUT /api/patients/:patientId/visits/:id
 router.put(
-  '/:visitId',
+  '/:id',
   requireAdminOrReceptionist,
   auditLog('UPDATE', 'Visit'),
   async (req, res, next) => {
     try {
-      const visit = await visitService.updateVisit(req.params.visitId, req.body);
+      const visit = await visitService.updateVisit(req.params.patientId, req.params.id, req.body);
       res.json({ success: true, message: 'Visit updated successfully', data: visit });
     } catch (err) {
       next(err);
@@ -46,14 +46,14 @@ router.put(
   }
 );
 
-// DELETE /api/patients/:patientId/visits/:visitId
+// DELETE /api/patients/:patientId/visits/:id
 router.delete(
-  '/:visitId',
+  '/:id',
   requireAdminOrReceptionist,
   auditLog('DELETE', 'Visit'),
   async (req, res, next) => {
     try {
-      const result = await visitService.deleteVisit(req.params.visitId);
+      const result = await visitService.deleteVisit(req.params.patientId, req.params.id);
       res.json({ success: true, message: result.message });
     } catch (err) {
       next(err);

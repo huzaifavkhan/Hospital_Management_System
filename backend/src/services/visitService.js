@@ -74,10 +74,16 @@ const createVisit = async (patientId, { doctorId, visitDate, diagnosis, summary 
   });
 };
 
-const updateVisit = async (visitId, { diagnosis, summary, visitDate }) => {
+const updateVisit = async (patientId, visitId, { diagnosis, summary, visitDate }) => {
+  const numericPatientId = parseId(patientId);
   const numericId = parseId(visitId);
   const visit = await prisma.visit.findUnique({ where: { id: numericId } });
   if (!visit) {
+    const err = new Error('Visit not found');
+    err.status = 404;
+    throw err;
+  }
+  if (visit.patientId !== numericPatientId) {
     const err = new Error('Visit not found');
     err.status = 404;
     throw err;
@@ -105,10 +111,16 @@ const updateVisit = async (visitId, { diagnosis, summary, visitDate }) => {
   });
 };
 
-const deleteVisit = async (visitId) => {
+const deleteVisit = async (patientId, visitId) => {
+  const numericPatientId = parseId(patientId);
   const numericId = parseId(visitId);
   const visit = await prisma.visit.findUnique({ where: { id: numericId } });
   if (!visit) {
+    const err = new Error('Visit not found');
+    err.status = 404;
+    throw err;
+  }
+  if (visit.patientId !== numericPatientId) {
     const err = new Error('Visit not found');
     err.status = 404;
     throw err;

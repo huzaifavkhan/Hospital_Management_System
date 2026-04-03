@@ -86,26 +86,40 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
   return { message: 'Password changed successfully' };
 };
 
-// Generate a reset token (no email service — token returned in response for testability)
+// Generate a reset token (token only returned in explicit non-production environments for testability)
 const forgotPassword = async ({ username }) => {
   if (!username) {
     const err = new Error('username is required');
     err.status = 400;
     throw err;
   }
+  const exposeResetToken =
+    process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  const response = {
+    message: 'If that username exists, a reset token has been generated',
+    ...(exposeResetToken ? { resetToken: null } : {}),
+  };
+
   const user = await prisma.user.findUnique({ where: { username } });
   // Always respond the same way to avoid user enumeration
   if (!user || !user.isActive) {
-    return { message: 'If that username exists, a reset token has been generated' };
+    return response;
   }
+
   const token = crypto.randomBytes(32).toString('hex');
+  // Store a hash of the token so plaintext is never persisted
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordResetToken: token, passwordResetExpiry: expiry },
+    data: { passwordResetToken: tokenHash, passwordResetExpiry: expiry },
   });
-  // In production this token would be emailed; returned here for testability
-  return { message: 'Reset token generated', resetToken: token };
+
+  if (exposeResetToken) {
+    response.resetToken = token;
+  }
+
+  return response;
 };
 
 // Reset password using the token
@@ -115,9 +129,11 @@ const resetPassword = async ({ resetToken, newPassword }) => {
     err.status = 400;
     throw err;
   }
+  // Hash the incoming token to compare against the stored hash
+  const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
   const user = await prisma.user.findFirst({
     where: {
-      passwordResetToken: resetToken,
+      passwordResetToken: tokenHash,
       passwordResetExpiry: { gte: new Date() },
       isActive: true,
     },

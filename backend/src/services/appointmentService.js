@@ -27,7 +27,7 @@ const checkDoubleBooking = async (doctorId, dateTime, excludeAppointmentId = nul
   const where = {
     doctorId,
     status: { in: ['SCHEDULED', 'RESCHEDULED'] },
-    dateTime: { gte: start, lte: end },
+    dateTime: { gt: start, lt: end },
   };
   if (excludeAppointmentId) {
     where.id = { not: excludeAppointmentId };
@@ -55,8 +55,29 @@ const getAllAppointments = async ({ page = 1, limit = 10, patientId, doctorId, s
   }
   if (from || to) {
     where.dateTime = {};
-    if (from) where.dateTime.gte = new Date(from);
-    if (to) where.dateTime.lte = new Date(to);
+    if (from) {
+      const fromDate = new Date(from);
+      if (isNaN(fromDate.getTime())) {
+        const err = new Error('from must be a valid ISO date string');
+        err.status = 400;
+        throw err;
+      }
+      where.dateTime.gte = fromDate;
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (isNaN(toDate.getTime())) {
+        const err = new Error('to must be a valid ISO date string');
+        err.status = 400;
+        throw err;
+      }
+      if (from && toDate < where.dateTime.gte) {
+        const err = new Error('to must be greater than or equal to from');
+        err.status = 400;
+        throw err;
+      }
+      where.dateTime.lte = toDate;
+    }
   }
 
   const [appointments, total] = await Promise.all([
@@ -109,43 +130,61 @@ const createAppointment = async ({ patientId, doctorId, dateTime, notes }) => {
     throw err;
   }
 
-  const [patient, doctor] = await Promise.all([
-    prisma.patient.findUnique({ where: { id: numericPatientId } }),
-    prisma.doctor.findUnique({ where: { id: numericDoctorId } }),
-  ]);
-  if (!patient) {
-    const err = new Error('Patient not found');
-    err.status = 404;
-    throw err;
-  }
-  if (!doctor) {
-    const err = new Error('Doctor not found');
-    err.status = 404;
-    throw err;
-  }
+  return prisma.$transaction(
+    async (tx) => {
+      const [patient, doctor] = await Promise.all([
+        tx.patient.findUnique({ where: { id: numericPatientId } }),
+        tx.doctor.findUnique({ where: { id: numericDoctorId } }),
+      ]);
 
-  const conflict = await checkDoubleBooking(numericDoctorId, parsedDate);
-  if (conflict) {
-    const err = new Error(`Doctor already has an appointment at this time (${conflict.dateTime.toISOString()}). Please choose a different time slot.`);
-    err.status = 409;
-    throw err;
-  }
+      if (!patient) {
+        const err = new Error('Patient not found');
+        err.status = 404;
+        throw err;
+      }
+      if (!doctor) {
+        const err = new Error('Doctor not found');
+        err.status = 404;
+        throw err;
+      }
 
-  const appointmentId = generateAppointmentId();
+      const windowMs = 30 * 60 * 1000;
+      const start = new Date(parsedDate.getTime() - windowMs);
+      const end = new Date(parsedDate.getTime() + windowMs);
 
-  return prisma.appointment.create({
-    data: {
-      appointmentId,
-      patientId: numericPatientId,
-      doctorId: numericDoctorId,
-      dateTime: parsedDate,
-      notes,
+      const conflict = await tx.appointment.findFirst({
+        where: {
+          doctorId: numericDoctorId,
+          status: { in: ['SCHEDULED', 'RESCHEDULED'] },
+          dateTime: { gt: start, lt: end },
+        },
+        select: { dateTime: true },
+      });
+
+      if (conflict) {
+        const err = new Error(`Doctor already has an appointment at this time (${conflict.dateTime.toISOString()}). Please choose a different time slot.`);
+        err.status = 409;
+        throw err;
+      }
+
+      const appointmentId = generateAppointmentId();
+
+      return tx.appointment.create({
+        data: {
+          appointmentId,
+          patientId: numericPatientId,
+          doctorId: numericDoctorId,
+          dateTime: parsedDate,
+          notes,
+        },
+        include: {
+          patient: { select: { id: true, patientId: true, name: true, contactNumber: true } },
+          doctor: { select: { id: true, doctorId: true, name: true, specialization: true } },
+        },
+      });
     },
-    include: {
-      patient: { select: { id: true, patientId: true, name: true, contactNumber: true } },
-      doctor: { select: { id: true, doctorId: true, name: true, specialization: true } },
-    },
-  });
+    { isolationLevel: 'Serializable' }
+  );
 };
 
 const updateAppointment = async (id, { dateTime, notes, status }) => {

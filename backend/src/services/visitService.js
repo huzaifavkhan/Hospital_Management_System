@@ -74,6 +74,11 @@ const updateVisit = async (patientId, visitId, { diagnosis, summary, visitDate }
     err.status = 404;
     throw err;
   }
+  if (visit.patientId !== numericPatientId) {
+    const err = new Error('Visit not found');
+    err.status = 404;
+    throw err;
+  }
 
   const updateData = {};
   if (diagnosis !== undefined) updateData.diagnosis = diagnosis;

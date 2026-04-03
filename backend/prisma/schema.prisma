@@ -13,16 +13,25 @@ enum Role {
   STAFF
 }
 
+enum AppointmentStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+  RESCHEDULED
+}
+
 model User {
-  id        Int        @id @default(autoincrement())
-  username  String     @unique
-  password  String
-  fullName  String
-  role      Role       @default(RECEPTIONIST)
-  isActive  Boolean    @default(true)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  auditLogs AuditLog[]
+  id                  Int        @id @default(autoincrement())
+  username            String     @unique
+  password            String
+  fullName            String
+  role                Role       @default(RECEPTIONIST)
+  isActive            Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  auditLogs           AuditLog[]
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
 }
 
 model Patient {
@@ -38,6 +47,7 @@ model Patient {
   updatedAt      DateTime        @updatedAt
   doctors        PatientDoctor[]
   visits         Visit[]
+  appointments   Appointment[]
 }
 
 model Department {
@@ -62,6 +72,7 @@ model Doctor {
   updatedAt            DateTime        @updatedAt
   patients             PatientDoctor[]
   visits               Visit[]
+  appointments         Appointment[]
 }
 
 model Visit {
@@ -75,6 +86,20 @@ model Visit {
   doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Appointment {
+  id            Int               @id @default(autoincrement())
+  appointmentId String            @unique
+  patientId     Int
+  doctorId      Int
+  dateTime      DateTime
+  status        AppointmentStatus @default(SCHEDULED)
+  notes         String?
+  patient       Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor        Doctor            @relation(fields: [doctorId], references: [id])
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 model PatientDoctor {

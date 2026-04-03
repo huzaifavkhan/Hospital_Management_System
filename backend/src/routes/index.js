@@ -24,6 +24,7 @@ safeMount('/auth', './auth');
 safeMount('/patients', './patients');
 safeMount('/patients/:patientId/visits', './visits');
 safeMount('/doctors', './doctors');
+safeMount('/appointments', './appointments');
 safeMount('/admin', './admin');
 
 module.exports = router;

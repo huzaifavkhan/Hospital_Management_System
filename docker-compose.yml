@@ -38,9 +38,9 @@ services:
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
       SMTP_SECURE: false
-      SMTP_USER: huzaifaahmed581@gmail.com
-      SMTP_PASS: zeagflvllqyejplf
-      SMTP_FROM: huzaifaahmed581@gmail.com
+      SMTP_USER: 
+      SMTP_PASS: 
+      SMTP_FROM: 
     ports:
       - '5001:5001'
     volumes:

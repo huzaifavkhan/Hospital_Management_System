@@ -2,8 +2,6 @@
 
 A full-stack Hospital Management System built for the Web-Based Application Development course.
 
----
-
 ## Project Overview
 
 HMS is a role-based clinical management platform that streamlines patient registration, doctor scheduling, appointment booking, and hospital administration from a single trusted interface. It supports two user roles — **Admin** and **Receptionist** — each with tailored access controls.

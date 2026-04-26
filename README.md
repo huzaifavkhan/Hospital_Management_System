@@ -81,8 +81,6 @@ HMS is a role-based clinical management platform that streamlines patient regist
 | bcryptjs | Password hashing |
 | jsonwebtoken | JWT authentication |
 
----
-
 ## Setup Steps
 
 ### Prerequisites

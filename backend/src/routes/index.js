@@ -21,6 +21,7 @@ function safeMount(path, modulePath) {
 }
 
 safeMount('/auth', './auth');
+safeMount('/stats', './stats');
 safeMount('/patients', './patients');
 safeMount('/patients/:patientId/visits', './visits');
 safeMount('/doctors', './doctors');

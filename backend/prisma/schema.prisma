@@ -32,6 +32,7 @@ model User {
   auditLogs           AuditLog[]
   passwordResetToken  String?
   passwordResetExpiry DateTime?
+  email               String?   @unique
 }
 
 model Patient {

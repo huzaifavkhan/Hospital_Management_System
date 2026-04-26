@@ -164,7 +164,7 @@ const getAllUsers = async ({ page = 1, limit = 10, search, role } = {}) => {
       skip,
       take: limitNum,
       orderBy: { createdAt: 'desc' },
-      select: { id: true, username: true, fullName: true, role: true, isActive: true, createdAt: true, updatedAt: true },
+      select: { id: true, username: true, fullName: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true },
     }),
     prisma.user.count({ where }),
   ]);
@@ -176,7 +176,7 @@ const getUserById = async (id) => {
   const numericId = parseId(id);
   const user = await prisma.user.findUnique({
     where: { id: numericId },
-    select: { id: true, username: true, fullName: true, role: true, isActive: true, createdAt: true, updatedAt: true },
+    select: { id: true, username: true, fullName: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true },
   });
   if (!user) {
     const err = new Error('User not found');
@@ -186,7 +186,7 @@ const getUserById = async (id) => {
   return user;
 };
 
-const createUser = async ({ username, password, fullName, role }) => {
+const createUser = async ({ username, password, fullName, role, email }) => {
   if (!username || !password || !fullName) {
     const err = new Error('username, password, and fullName are required');
     err.status = 400;
@@ -206,8 +206,8 @@ const createUser = async ({ username, password, fullName, role }) => {
   }
   const hashed = await bcrypt.hash(password, 10);
   return prisma.user.create({
-    data: { username, password: hashed, fullName, role: resolvedRole },
-    select: { id: true, username: true, fullName: true, role: true, isActive: true, createdAt: true },
+    data: { username, password: hashed, fullName, role: resolvedRole, email: email || null },
+    select: { id: true, username: true, fullName: true, email: true, role: true, isActive: true, createdAt: true },
   });
 };
 
@@ -225,11 +225,13 @@ const updateUser = async (id, data) => {
   }
   if (data.isActive !== undefined) updateData.isActive = Boolean(data.isActive);
   if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+  // Allow clearing email by passing empty string; null means "no change" so we use undefined check
+  if ('email' in data) updateData.email = data.email || null;
 
   return prisma.user.update({
     where: { id: parseId(id) },
     data: updateData,
-    select: { id: true, username: true, fullName: true, role: true, isActive: true, updatedAt: true },
+    select: { id: true, username: true, fullName: true, email: true, role: true, isActive: true, updatedAt: true },
   });
 };
 

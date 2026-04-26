@@ -2,6 +2,7 @@ const prisma = require('../db/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { sendPasswordResetEmail } = require('./emailService');
 
 const register = async ({ username, password, fullName, role }) => {
   const existing = await prisma.user.findUnique({ where: { username } });
@@ -86,23 +87,19 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
   return { message: 'Password changed successfully' };
 };
 
-// Generate a reset token (token only returned in explicit non-production environments for testability)
+// Generate a reset token and email it to the user
 const forgotPassword = async ({ username }) => {
   if (!username) {
     const err = new Error('username is required');
     err.status = 400;
     throw err;
   }
-  const exposeResetToken =
-    process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
-  const response = {
-    message: 'If that username exists, a reset token has been generated',
-    ...(exposeResetToken ? { resetToken: null } : {}),
-  };
+
+  const response = { message: 'If that account exists and has an email address, a reset token has been sent.' };
 
   const user = await prisma.user.findUnique({ where: { username } });
   // Always respond the same way to avoid user enumeration
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || !user.email) {
     return response;
   }
 
@@ -115,9 +112,7 @@ const forgotPassword = async ({ username }) => {
     data: { passwordResetToken: tokenHash, passwordResetExpiry: expiry },
   });
 
-  if (exposeResetToken) {
-    response.resetToken = token;
-  }
+  await sendPasswordResetEmail({ toEmail: user.email, toName: user.fullName, resetToken: token });
 
   return response;
 };

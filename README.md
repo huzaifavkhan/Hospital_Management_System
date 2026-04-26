@@ -6,8 +6,6 @@ A full-stack Hospital Management System built for the Web-Based Application Deve
 
 HMS is a role-based clinical management platform that streamlines patient registration, doctor scheduling, appointment booking, and hospital administration from a single trusted interface. It supports two user roles — **Admin** and **Receptionist** — each with tailored access controls.
 
----
-
 ## Features
 
 ### Authentication
@@ -59,8 +57,6 @@ HMS is a role-based clinical management platform that streamlines patient regist
 ### X-Factor Extras
 - **Dark mode toggle** — persisted to localStorage, full Tailwind `dark:` class switch, accessible from header
 - **Animated stat counters** — dashboard numbers count up from 0 on page load via `requestAnimationFrame` cubic ease-out
-
----
 
 ## Tech Stack
 
@@ -131,8 +127,6 @@ Frontend runs at `http://localhost:3000`
 
 > Check `backend/prisma/seed.js` for the exact seeded credentials.
 
----
-
 ## Environment Variables
 
 ### `backend/.env`
@@ -141,8 +135,6 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hms
 JWT_SECRET=your_jwt_secret_here
 PORT=5001
 ```
-
----
 
 ## Project Structure
 
@@ -173,8 +165,6 @@ Hospital_Management_System/
 │       └── index.css         Tailwind directives + custom CSS variables + animations
 └── docker-compose.yml    PostgreSQL container definition
 ```
-
----
 
 ## Team Contributions
 

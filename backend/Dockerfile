@@ -11,6 +11,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY . .
+RUN test -f .env || cp .env.example .env
 
 EXPOSE 5001
 
